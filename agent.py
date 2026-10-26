@@ -13,7 +13,7 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
-import config
+import re
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
@@ -49,6 +49,32 @@ def new_session(query: str, wardrobe: dict) -> dict:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
+def _parse_query(query: str) -> dict:
+    """Extract explicit size/budget phrases, then keep the search keywords."""
+    price_pattern = (
+        r"\b(?:under|below|up to|at most|max(?:imum)?(?: price)?(?: of)?|budget(?: of)?)"
+        r"\s*\$?\s*(\d+(?:\.\d{1,2})?)(?:\s*(?:dollars?|usd))?\b"
+    )
+    price_match = re.search(price_pattern, query, re.I)
+    description = re.sub(price_pattern, " ", query, flags=re.I)
+
+    letter_size = r"(?:xxxs|xxs|xs|xxxl|xxl|xl|s|m|l)"
+    size_pattern = (
+        r"\b(?:in\s+)?size\s*[:=]?\s*(one\s+size|w\d+(?:\s+l\d+)?|"
+        r"(?:us\s*)?\d+(?:\.\d+)?|"
+        + letter_size + r"(?:\s*/\s*" + letter_size + r")?)\b"
+    )
+    size_match = re.search(size_pattern, description, re.I)
+    description = re.sub(size_pattern, " ", description, flags=re.I)
+    filler = {"i", "am", "looking", "for", "a", "an", "the", "find", "me", "please", "want", "in"}
+    words = re.findall(r"\w+", description.casefold())
+    return {
+        "description": " ".join(word for word in words if word not in filler),
+        "size": size_match.group(1).strip() if size_match else None,
+        "max_price": float(price_match.group(1)) if price_match else None,
+    }
+
+
 def run_agent(query: str, wardrobe: dict) -> dict:
     """
     Run the loop once and return the finished session.
@@ -64,7 +90,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         the run ended early and the later fields will still be None.
 
     ─────────────────────────────────────────────────────────────────────────
-    TODO — build this, following the branch rule you wrote in Milestone 2.
+    Unit 3 behavior, following the branch rule in the README:
 
       1. Start a session with new_session().
 
@@ -107,9 +133,32 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
-    return session
+    iterations = 0
+    while True:
+        iterations += 1
+        trace.check_iterations(iterations)
+
+        if not session["parsed"]:
+            session["parsed"] = _parse_query(session["query"])
+        elif session["selected_item"] is None:
+            session["search_results"] = search_listings(**session["parsed"])
+            if not session["search_results"]:
+                session["error"] = (
+                    "No listings matched this search. Try broader keywords "
+                    "(for example, 'tee'), change or remove the size filter, "
+                    "or raise the price ceiling."
+                )
+                return session
+            session["selected_item"] = session["search_results"][0]
+        elif session["outfit_suggestion"] is None:
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"], session["wardrobe"]
+            )
+        else:
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"], session["selected_item"]
+            )
+            return session
 
 
 # ── running it directly ───────────────────────────────────────────────────────
