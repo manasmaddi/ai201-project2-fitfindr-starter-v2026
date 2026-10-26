@@ -13,10 +13,10 @@
 > python app.py ask 'vintage graphic tee under $30'
 > ```
 >
-> All three tools are stubs, so that last command will do nothing useful yet.
-> That's the starting position.
+> Unit 3 is implemented: the tools run independently and the agent branches
+> on search results. Unit 4 sections below remain for the next unit.
 >
-> **The rest of this file is your submission.** Fill it in as you go.
+> **Submission repository:** [manasmaddi/ai201-project2-fitfindr-starter-v2026](https://github.com/manasmaddi/ai201-project2-fitfindr-starter-v2026). Keep this same URL for the next unit.
 
 ---
 
@@ -39,8 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+FitFindr takes a thrift-shopping request such as “vintage graphic tee under $30, size M” and searches 40 local mock listings. It filters by size and budget, selects the best keyword match, suggests outfits using saved wardrobe pieces, and writes a short fit-card caption through Gemini. With an empty wardrobe it gives general styling ideas; with no matching listing it stops and suggests changes to the search. This Unit 3 build runs locally from the terminal.
 
 
 ---
@@ -84,57 +83,98 @@
 
 ## Sample Run
 
-<!-- Two things go here.
-
-     1. One FULL query and its output, pasted as text.
-     2. Your three per-tool terminal tests — the command and what it printed. -->
+Commands below use the project's Python 3.13 virtual environment. After activating it, `python` can replace `.venv/bin/python`. Outputs are real terminal output; model wording can vary.
 
 **One full query**
 
-```
-$ python app.py ask '...'
+```text
+$ .venv/bin/python app.py ask 'vintage graphic tee under $30, size M'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Outfit 1: Y2K Streetwear Contrast
+- Top: Y2K Baby Tee — Butterfly Print
+- Bottoms: Baggy straight-leg jeans, dark wash
+- Shoes: Chunky white sneakers
+- Accessories: Black crossbody bag
+
+Why it works: This pairing plays on the classic Y2K silhouette contrast. The fitted, cropped length of the baby tee balances out the voluminous, high-waisted fit of the baggy dark wash jeans, while the white sneakers tie in the white tones of the butterfly graphic.
+
+
+Outfit 2: Edgy Casual Mix
+- Top: Y2K Baby Tee — Butterfly Print
+- Outerwear: Vintage black denim jacket
+- Bottoms: Wide-leg khaki trousers
+- Shoes: Black combat boots
+- Accessories: Brown leather belt
+
+Why it works: The fitted pastel and white butterfly tee adds a soft touch against the structured earth tones of the wide-leg khaki trousers. Layering the slightly cropped black denim jacket and finishing with black combat boots grounds the sweeter Y2K print with an effortless, grunge-leaning edge.
+
+  Fit card: Channeling total 2000s mall energy with this Y2K Baby Tee — Butterfly Print, especially paired with wide-leg khaki trousers and chunky boots for that perfect grunge-leaning edge. I spotted it on depop for $18.00 and can't get over how good the pastel graphic looks with earth tones. Such an easy piece to throw on and instantly make the outfit.
+
+1 model calls this session, 1 served from cache, 464 prompt + 83 output tokens
 ```
 
 **The three tools, tested one at a time**
 
-```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+Each command prints one line, including the empty case. Embedded `\n` sequences in outfit text are literal escapes in that printed dictionary. These standalone calls were checked before wiring the loop.
 
-```
-
-```
-$ python -c "from tools import suggest_outfit; ..."
-
+```text
+$ .venv/bin/python -c 'from tools import search_listings; print({"matches": [(x["id"], x["size"], x["price"]) for x in search_listings("graphic tee", size="M", max_price=18)], "empty": search_listings("unicorn spacesuit", size="XXS", max_price=0)})'
+{'matches': [('lst_002', 'S/M', 18.0), ('lst_017', 'S/M', 15.0)], 'empty': []}
 ```
 
+```text
+$ .venv/bin/python -c 'from tools import suggest_outfit; from utils.data_loader import load_listings, get_example_wardrobe, get_empty_wardrobe; item=load_listings()[1]; print({"wardrobe": suggest_outfit(item, get_example_wardrobe()), "empty_wardrobe": suggest_outfit(item, get_empty_wardrobe())})'
+{'wardrobe': 'Outfit 1: Y2K Streetwear Contrast\n- Top: Y2K Baby Tee — Butterfly Print\n- Bottoms: Baggy straight-leg jeans, dark wash\n- Shoes: Chunky white sneakers\n- Accessories: Black crossbody bag\n\nWhy it works: This pairing plays on the classic Y2K silhouette contrast. The fitted, cropped length of the baby tee balances out the voluminous, high-waisted fit of the baggy dark wash jeans, while the white sneakers tie in the white tones of the butterfly graphic.\n\n\nOutfit 2: Edgy Casual Mix\n- Top: Y2K Baby Tee — Butterfly Print\n- Outerwear: Vintage black denim jacket\n- Bottoms: Wide-leg khaki trousers\n- Shoes: Black combat boots\n- Accessories: Brown leather belt\n\nWhy it works: The fitted pastel and white butterfly tee adds a soft touch against the structured earth tones of the wide-leg khaki trousers. Layering the slightly cropped black denim jacket and finishing with black combat boots grounds the sweeter Y2K print with an effortless, grunge-leaning edge.', 'empty_wardrobe': '1. Pair the baby tee with low-rise baggy cargo pants and chunky platform sneakers for an authentic Y2K streetwear look.\n2. Layer it under a slip dress or pair it with a pleated mini skirt and shoulder bag for a sweet, nostalgic aesthetic.'}
 ```
-$ python -c "from tools import create_fit_card; ..."
 
+```text
+$ AI201_CACHE=0 .venv/bin/python -c 'from tools import create_fit_card; from utils.data_loader import load_listings; item=load_listings()[1]; outfit="Baggy dark wash jeans and chunky white sneakers for a relaxed Y2K vibe"; print({"cards": [create_fit_card(outfit, item) for _ in range(3)], "empty_outfit": create_fit_card("   ", item)})'
+{'cards': ['Scored this Y2K Baby Tee — Butterfly Print on depop for $18.00 and I am obsessed. It has the absolute cutest early 2000s graphic and fits like a dream. Throwing it on with baggy dark wash jeans and chunky white sneakers gives it that perfect effortless, relaxed Y2K vibe.', 'Paired this Y2K Baby Tee — Butterfly Print with some baggy dark wash jeans and chunky white sneakers for the ultimate relaxed Y2K vibe. Found it on depop for just $18.00 and I am low-key obsessed with the pastel graphic.', "Found this Y2K Baby Tee — Butterfly Print on depop for $18.00 and I am obsessed. I'd style it with baggy dark wash jeans and chunky white sneakers for a relaxed Y2K vibe. It’s giving total early 2000s mall goth energy in the best way possible."], 'empty_outfit': 'No outfit suggestion was provided. Add an outfit before creating a fit card.'}
+```
+
+The three uncached captions above were read and are different from each other. `TEMPERATURE` remains `0.9`; `AI201_CACHE=0` disables the default response cache for that command, so all three captions came from fresh model calls. The outfit output names saved pieces when the wardrobe is populated and offers general ideas when it is empty. No tool is hardcoded in place of its implementation; the model tools include fallbacks only for blank model text.
+
+**Empty-search branch**
+
+```text
+$ .venv/bin/python app.py ask 'designer ballgown size XXS under $5'
+
+  No listings matched this search. Try broader keywords (for example, 'tee'), change or remove the size filter, or raise the price ceiling.
+
+0 model calls this session
+```
+
+That message gives a reader three concrete next attempts: use a broader term such as `tee`, change or omit `size XXS`, or raise `under $5`. It has not yet received a breakout-group or external Claude review.
+
+**Session and state checks**
+
+I printed the completed happy-path and impossible-query sessions from the terminal. The happy path stored `lst_002` in `selected_item`, along with a non-empty outfit and fit card. Wrapping the real `suggest_outfit` call confirmed `outfit.call_args.args[0] is session["selected_item"]` printed `True`. The impossible query stored `{"description": "designer ballgown", "size": "XXS", "max_price": 5.0}` in `parsed`, `[]` in `search_results`, and left `selected_item`, `outfit_suggestion`, and `fit_card` as `None`.
+
+Focused local checks also assert the exact tool arguments against stored session values, verify that neither model tool runs after an empty search, and exercise size boundaries, an inclusive price ceiling, a zero budget, blank inputs, empty-wardrobe prompt selection, and the iteration limit. These checks use mocks for model responses and do not measure model quality over five tries; that evaluation belongs to Unit 4.
+
+```text
+$ .venv/bin/python -m unittest test_unit3 -v
+Ran 14 tests
+OK
 ```
 
 ---
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
+**Moment 1 — implementing search from the spec**
 
-     "I used Claude to help me code" is not enough.
+- *What I asked for:* I asked Codex to inspect this repository and complete the Unit 3 milestones, including the three tools and their empty cases.
+- *What came back:* It found my unfinished search tested whether an entire listing description appeared inside the query, and pointed out that substring size matching could confuse `S` with `US 9` and `L` with `XL`.
+- *What I changed:* With Codex's help, I replaced the unfinished search with whole-word keyword scoring, independent size and inclusive price filters, token-based size matching, and an explicit `[]` for no matches. The terminal test found the two medium-compatible tees at or below $18 and returned `[]` for the impossible search.
 
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
+**Moment 2 — checking the branch and state**
 
-**Moment 1**
-
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
-
-**Moment 2**
-
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* In the same request, I asked Codex to wire the loop so each tool stores its result in the session and an impossible query stops early.
+- *What came back:* It implemented a loop that branches on the stored search results, plus focused checks comparing the actual arguments sent to the next tool with the session. It also found that my criterion 3 covered an empty wardrobe but omitted the required state check.
+- *What I changed:* With Codex's help, I added observable state requirements to criterion 3, stored every result before the next call, and used an empty-search message that names keywords, size, and price changes. The happy path passed the stored selected item to styling; the impossible query made zero model calls and left its fit card as `None`.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
@@ -278,14 +318,14 @@ full. -->
 
      SUBMISSION CHECKLIST — unit 3
 
-       [ ] criteria.md has five numbered criteria, each with a target
-       [ ] Each criterion has a reason underneath it
-       [ ] All five unit 3 sections above have real content
-       [ ] Tool Inventory: all three tools, inputs WITH TYPES, a specific
+       [x] criteria.md has five numbered criteria, each with a target
+       [x] Each criterion has a reason underneath it
+       [x] All five unit 3 sections above have real content
+       [x] Tool Inventory: all three tools, inputs WITH TYPES, a specific
            return value, and the empty case
-       [ ] Planning Loop names the branch rule and agent.py::run_agent
-       [ ] Sample Run: one full query plus the three per-tool tests, as text
-       [ ] At least four new commits
+       [x] Planning Loop names the branch rule and agent.py::run_agent
+       [x] Sample Run: one full query plus the three per-tool tests, as text
+       [x] At least four new commits
        [ ] Repository URL submitted — WRITE IT DOWN, you submit the same one
            next unit
 
