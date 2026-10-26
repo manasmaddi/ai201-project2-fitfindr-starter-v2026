@@ -17,7 +17,7 @@ From inside this repo after you've forked and cloned it:
 **macOS / Linux**
 
 ```bash
-python3 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # then paste your key into .env
@@ -27,7 +27,7 @@ python test.py
 **Windows (PowerShell)**
 
 ```powershell
-python -m venv .venv
+py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env         # then paste your key into .env

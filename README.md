@@ -47,59 +47,38 @@
 
 ## Tool Inventory
 
-<!-- Four lines per tool. This is worth 2 points and it's the single most
-     common place students lose them.
-
-     "Returns a list" earns NOTHING. The description has to say what is IN
-     the list.
-
-     The empty case isn't optional either — it's the thing your loop branches
-     on, and if you don't decide it here you'll discover it as a crash in
-     Milestone 5. -->
-
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Load listings through `load_listings()`, filter size and budget, and rank by case-insensitive keyword overlap across title, description, category, style tags, colors, and brand. Whole words match; ties retain dataset order.
+- **Inputs:** `description: str`, `size: str | None = None`, `max_price: float | None = None`.
+- **Returns:** Up to `config.SEARCH_RESULT_LIMIT` listing dictionaries, best match first, containing `id`, `title`, `description`, `category`, `style_tags: list[str]`, `size`, `condition`, `price: float`, `colors: list[str]`, `brand: str | None`, and `platform`. Price is an inclusive ceiling. Size tokens match case-insensitively: `M` matches `S/M`; `S` does not match `US 9`; `L` does not match `XL`; `8` matches `US 8` but not `US 8.5`; `W30` matches `W30 L30`. Parenthetical fit notes are ignored. Compound requested sizes must have all their tokens present. `One Size` is matched explicitly, not treated as every size.
+- **When it has nothing:** Return `[]`, including a blank description or zero keyword matches.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Ask the model through the starter's `generate()` adapter for one or two outfits using the selected thrift item and named wardrobe pieces.
+- **Inputs:** `new_item: dict` (a listing), `wardrobe: dict` with `items: list[dict]`.
+- **Returns:** A non-empty string naming the new item and specific pieces the user owns. A missing brand does not prevent styling.
+- **When it has nothing:** An empty wardrobe requests general styling advice without claiming the user owns suggested pieces. If the model returns blank text, return brief general styling advice.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Ask the model through `generate()` for a social caption about the find and outfit.
+- **Inputs:** `outfit: str`, `new_item: dict` (a listing).
+- **Returns:** A two-to-four sentence caption with a specific vibe, mentioning the item's title, price, and platform once each. If the model returns blank text, return a short caption using the supplied facts.
+- **When it has nothing:** For an empty or whitespace-only outfit, return `No outfit suggestion was provided. Add an outfit before creating a fit card.` without calling the model.
 
 ---
 
 ## Planning Loop
 
-<!-- Your branch rule, stated as a rule — the condition AND both paths — plus
-     the file and function that holds it.
-
-     Like this:
-       "If search_listings returns an empty list, put a message in the session
-        and stop. Otherwise take the first result and go to suggest_outfit."
-        — agent.py::run_agent
-
-     The grader checks your code against what you claim here, so the file and
-     function have to be real. -->
-
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, store a message naming changes to keywords, size, or budget in `session["error"]` and stop; otherwise select the first result, suggest an outfit, and create a fit card.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regular expressions extract an optional `size` (including `US 8`, `W30 L30`, or `S/M`) and inclusive price ceiling such as `under $30` or `max $30`. Those phrases and conversational filler are removed from the keyword description. Unsupported phrasing is not interpreted semantically.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` → `parsed` → `search_results` → `selected_item` → `outfit_suggestion` → `fit_card`. `wardrobe` is stored when the session starts. Each tool result is saved before the next tool reads its inputs from the session. `trace.check_iterations()` enforces `config.MAX_ITERATIONS`. Empty search leaves the selected item, outfit, and fit card as `None`.
 
 ---
 

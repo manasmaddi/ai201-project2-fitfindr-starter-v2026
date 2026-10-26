@@ -25,9 +25,9 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+The search uses keyword overlap rather than semantic matching, so alternate
+phrasings can miss a listing even when it is relevant. Four of five allows one
+such miss while still requiring the full three-tool path to work consistently.
 
 ---
 
@@ -37,66 +37,54 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+An empty result list gives the loop a deterministic stopping condition that
+does not depend on model wording. Every run should take this branch and tell
+the user to change the keywords, size, or price ceiling.
 
 ---
 
-## 3. Something about state
+## 3. The selected item moves through the session, including with an empty wardrobe
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+For five matching queries, the listing dictionary passed to `suggest_outfit`
+must equal `session["selected_item"]`, and the outfit and item passed to
+`create_fit_card` must equal their stored session values, in 5 of 5 tries.
+Given a matching listing and a wardrobe with an empty `items` list,
+`suggest_outfit` also returns non-empty general styling advice without claiming the
+user owns any suggested pieces — in 5 of 5 tries.
 
 **Why this target:**
-
-
+State transfer is deterministic: the next tool must receive the exact item
+stored in the session. An empty wardrobe is a supported input, so it should
+always select the general styling prompt. The exact advice can vary, but requiring one particular outfit
+would be too strict for a model-generated response.
 
 ---
 
-## 4. Something about the fit card
+## 4. The fit card mentions the price
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+I would be unhappy to see a caption that never mentions the price, especially
+when `suggest_outfit` gives general advice. The fit card should mention the
+selected item's correct price in at least 4 of 5 tries.
 
 **Why this target:**
 
-
+Because it is the final step in the loop, it is crucial to contain the price
+information. Four of five allows an occasional omission from the model while
+still requiring the caption to include the price consistently.
 
 ---
 
-## 5. Your choice
+## 5. Search respects the user's budget
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+For five searches with explicit price ceilings, every returned listing has a
+price less than or equal to the requested ceiling. A listing priced exactly at
+the ceiling remains eligible when its keywords and size match.
 
 **Why this target:**
-
-
+Price filtering compares numeric listing prices and does not call the model,
+so zero over-budget results is a reasonable target. Including the boundary
+checks that the filter honors the tool's inclusive maximum rather than
+discarding an affordable item.
 
 ---
 
